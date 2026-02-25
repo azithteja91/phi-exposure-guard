@@ -1,5 +1,3 @@
-%%bash
-cat > /content/amphi_rl_graph/amphi_rl_dpgraph/dcpg.py <<'PY'
 from __future__ import annotations
 
 import math
@@ -378,4 +376,3 @@ def _is_cross_modal(mod_a: str, mod_b: str) -> bool:
 
 def _phi_type_match(mod_a: str, mod_b: str) -> bool:
     return _modality_to_phi_type(mod_a) == _modality_to_phi_type(mod_b)
-PY
