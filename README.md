@@ -29,19 +29,19 @@ De-identification becomes a longitudinal control problem rather than a static tr
 
 The system differs from conventional masking pipelines in several concrete ways:
 
-**Longitudinal Exposure Tracking**
+**Longitudinal Exposure Tracking:**
 Identity exposure is accumulated and tracked over time at the subject level.
 
-**Risk-Governed Policy Selection**
+**Risk-Governed Policy Selection:**
 Masking strength is selected dynamically based on quantified risk thresholds.
 
-**Cross-Modal Linkage Modeling**
+**Cross-Modal Linkage Modeling:**
 Signals from text, ASR transcripts, image proxies, waveform headers, and audio metadata are aggregated to evaluate identity-level exposure.
 
 **Localized Retokenization**
 When risk increases, pseudonym tokens can be versioned forward, containing linkage continuity without global reprocessing.
 
-**Auditability**
+**Auditability:**
 All masking decisions are logged with structured metadata and can be reproduced deterministically from exposure state.
 
 ## Demonstration
