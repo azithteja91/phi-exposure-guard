@@ -76,6 +76,28 @@ python src/amphi_rl_dpgraph/run_demo.py
 
 Results are written to the `results/` directory.
 
+## Data Description
+
+This repository does not contain real clinical data, personal information, or protected health information.
+
+All experiments operate on synthetically generated streams designed to simulate longitudinal healthcare data workflows. The synthetic data includes structured representations of:
+
+- Clinical note text
+- Speech transcription output
+- Image proxy signals
+- Waveform and monitoring features
+
+The streams are constructed to model realistic structural properties relevant to privacy evaluation, including:
+
+- Repeated subject mentions over time
+- Identifier recurrence
+- Variable disclosure frequency
+- Cross-modal co-occurrence patterns
+
+These properties allow controlled evaluation of cumulative identity exposure and adaptive masking behavior without exposing real individuals.
+
+Synthetic data is used to ensure reproducibility, transparency, and safe public distribution of the research implementation.
+
 ## Privacy–Utility Evaluation
 
 The demo evaluates:
