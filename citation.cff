@@ -1,0 +1,36 @@
+cff-version: 1.2.0
+message: "If you use this software in academic work, please cite it as follows."
+title: "Stateful Exposure-Aware De-Identification for Multimodal Streaming Data"
+
+type: software
+
+authors:
+  - family-names: "Ganti"
+    given-names: "VKAT"
+    email: "vkatganti@gmail.com"
+
+repository-code: "https://github.com/azithteja91/amphi_rl_dpgraph"
+
+abstract: >
+  Research implementation of an exposure-aware, adaptive PHI de-identification system 
+  for streaming multimodal data. The method models cumulative identity exposure 
+  over time and dynamically adjusts masking strength based on quantified 
+  re-identification risk. The framework supports cross-modal linkage modeling, 
+  structured audit logging, and reproducible privacy–utility evaluation 
+  in streaming machine learning environments.
+
+keywords:
+  - de-identification
+  - privacy-preserving machine learning
+  - PHI
+  - streaming data
+  - adaptive masking
+  - multimodal systems
+  - privacy-utility tradeoff
+
+identifiers:
+  - type: patent
+    description: "Related intellectual property by the author"
+    value: "U.S. patent application (pending)"
+
+license: "MIT"
