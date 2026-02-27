@@ -2,32 +2,39 @@
 
 ```mermaid
 flowchart LR
-%% === Inputs ===
-A["Streaming Inputs\nText notes / ASR transcripts / Image proxies / Waveform headers / Audio features"] --> B
 
-%% === Cross-modal + longitudinal state ===
-B["Normalization + PHI Signals\n(modality-specific detectors / proxy flags)"] --> C
+%% Input Layer
+A["Streaming Inputs<br/>Text · ASR · Image · Waveform · Audio"] --> B["Modality Parsers"]
 
-C["Entity Resolver\n(assign to entity_key, token version)"] --> D
+%% Exposure Extraction
+B --> C["Identifier Detection<br/>per modality"]
 
-D["Exposure State Store\n(Longitudinal accumulation over time)\n- cumulative exposure\n- recency-aware memory\n- cross-modal link signals"] --> E
+%% Cross-Modal Aggregation
+C --> D["Entity Resolver<br/>Cross-Modal Linking"]
 
-%% === Cross-modal aggregation / graph abstraction ===
-E["Cross-Modal Aggregation Layer\n(links + co-occurrence)\nRisk Graph Summary (optional)"] --> F
+%% Longitudinal State
+D --> E["Exposure State Store<br/>Persistent Entity Memory"]
 
-%% === Risk + decision ===
-F["Risk Engine\n(entity-level risk score)\n+ escalation triggers"] --> G
+%% Risk Modeling
+E --> F["Risk Estimator<br/>Cumulative Exposure Score"]
 
-G["Adaptive Policy Controller\n(state-dependent choice)\nraw / weak / pseudo / redact / synthetic"] --> H
+%% Adaptive Control
+F --> G["Adaptive Policy Controller"]
 
-%% === Execution ===
-H["Masking Execution Layer\n(CMO registry / compiled DAG)\nmodality-aware transforms"] --> I
+%% Masking Options
+G -->|Low Exposure| H["Weak / Light Masking"]
+G -->|Moderate Exposure| I["Consistent Pseudonymization"]
+G -->|High Exposure| J["Strong Redaction / Removal"]
 
-I["Sanitized Output Stream\n(masked text + transformed proxies)\n+ downstream-safe artifacts"] --> J
+%% Output Stream
+H --> K["Sanitized Output Stream"]
+I --> K
+J --> K
 
-%% === Auditability ===
-J["Structured Audit Log\n(reproducible decisions)\npolicy, risk, latency, linkage signals"] --> K
+%% Closed Loop
+K --> L["Post-Masking Update"]
+L --> E
 
-%% === Feedback / lifecycle ===
-K["Replay + Evaluation\n(leakage checks, utility proxies,\noptional RL reward logging)"] --> D
-
+%% Audit & Reproducibility
+G --> M["Decision Log"]
+M --> N["Audit Records<br/>Replayable Execution"]
