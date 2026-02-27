@@ -360,7 +360,7 @@ def run_policy(policy_run: str) -> Tuple[dict, dict, List[dict]]:
                 chosen = rl_action.policy
                 reason = f"{decision.reason} / rl:{rl_action.source}"
             else:
-                chosen = decision.chosen_policy
+                chosen = decision.policy_name
                 reason = decision.reason
 
             # Graph summary cache
