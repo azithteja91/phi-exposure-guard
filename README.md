@@ -167,6 +167,12 @@ Title:
 
 Stateful Exposure-Aware De-Identification for Multimodal Streaming Data
 
+## Patent notice
+
+This repository is associated with a U.S. provisional patent application filed on **2025-07-05**.
+
+Public release (GitHub): **2026-03-02**.
+
 ## License
 
 MIT License. See `LICENSE`.
