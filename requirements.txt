@@ -1,0 +1,11 @@
+cryptography>=41
+numpy>=1.23
+opencv-python>=4.8
+sentence-transformers>=2.2
+scikit-learn>=1.2
+torch>=2.0
+matplotlib>=3.7
+
+pytest>=7.4
+ruff>=0.4
+mypy>=1.8
