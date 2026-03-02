@@ -1,0 +1,28 @@
+{
+  "contract_hash": "2bd28f88877867d3",
+  "nodes": [
+    {
+      "id": "main_cmo",
+      "cmo": "PseudonymizeID",
+      "modality": "text",
+      "policy": "pseudo",
+      "predicate": null,
+      "fallback": false
+    },
+    {
+      "id": "fallback_redact",
+      "cmo": "RedactTextSpan",
+      "modality": "text",
+      "policy": "redact",
+      "predicate": null,
+      "fallback": true
+    }
+  ],
+  "edges": [
+    {
+      "src": "main_cmo",
+      "dst": "fallback_redact",
+      "label": "on_error"
+    }
+  ]
+}

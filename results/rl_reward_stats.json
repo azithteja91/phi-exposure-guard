@@ -1,0 +1,16 @@
+{
+  "torch_available": false,
+  "note": "model_n=0 expected when torch is not installed; all steps routed through threshold_warmup heuristic.",
+  "overall_mean": 0.21097,
+  "overall_min": 0.01941,
+  "overall_max": 0.43931,
+  "overall_n": 78,
+  "warmup_mean": 0.21097,
+  "warmup_min": 0.01941,
+  "warmup_max": 0.43931,
+  "warmup_n": 78,
+  "model_mean": 0.0,
+  "model_min": 0.0,
+  "model_max": 0.0,
+  "model_n": 0
+}
