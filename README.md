@@ -72,7 +72,7 @@ All experiments are reproducible from source using synthetic data generated with
 Run:
 
 ```
-python src/amphi_rl_dpgraph/run_demo.py
+python -m amphi_rl_dpgraph.run_demo
 ```
 
 Results are written to the `results/` directory.
