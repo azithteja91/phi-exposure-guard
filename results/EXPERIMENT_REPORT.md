@@ -4,11 +4,11 @@
 
 | Policy | Leak Total | Utility Proxy | Mean Latency (ms) | P90 Latency (ms) |
 | --- | --- | --- | --- | --- |
-| raw | 3.0256 | 1.0 | 0.072 | 0.085 |
-| weak | 2.0 | 0.512195 | 0.076 | 0.092 |
-| pseudo | 0.5128 | 1.0 | 0.085 | 0.103 |
-| redact | 0.5128 | 0.505051 | 0.082 | 0.098 |
-| adaptive | 0.5641 | 1.0 | 1.755 | 1.134 |
+| raw | 3.0256 | 1.0 | 0.076 | 0.096 |
+| weak | 2.0 | 0.512195 | 0.079 | 0.092 |
+| pseudo | 0.5128 | 1.0 | 0.091 | 0.108 |
+| redact | 0.5128 | 0.505051 | 0.086 | 0.102 |
+| adaptive | 0.5641 | 1.0 | 1.757 | 1.137 |
 
 ## Leakage Breakdown
 
@@ -24,11 +24,11 @@
 
 | Policy | Mean (ms) | P50 (ms) | P90 (ms) |
 | --- | --- | --- | --- |
-| raw | 0.072 | 0.073 | 0.085 |
-| weak | 0.076 | 0.081 | 0.092 |
-| pseudo | 0.085 | 0.087 | 0.103 |
-| redact | 0.082 | 0.088 | 0.098 |
-| adaptive | 1.755 | 0.931 | 1.134 |
+| raw | 0.076 | 0.074 | 0.096 |
+| weak | 0.079 | 0.083 | 0.092 |
+| pseudo | 0.091 | 0.092 | 0.108 |
+| redact | 0.086 | 0.091 | 0.102 |
+| adaptive | 1.757 | 0.92 | 1.137 |
 
 ## Adaptive Policy Notes
 
@@ -41,5 +41,5 @@ Cross-modal synergy triggered localized retokenization 2 time(s).
 - `dcpg_snapshot.json` (if enabled)
 - `dcpg_crdt_demo.json` (if enabled)
 - `rl_reward_stats.json` (if enabled)
-- `sample_dag.dot` / `sample_dag.json`
-- `privacy_utility_curve.png` (if matplotlib installed)
+- `sample_dag.dot` / `sample_dag.json` / `sample_dag.png`
+- `privacy_utility_curve.png`

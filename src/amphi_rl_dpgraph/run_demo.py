@@ -641,8 +641,8 @@ def _write_experiment_report(metrics_rows: List[dict], latency_rows: List[dict],
         "- `dcpg_snapshot.json` (if enabled)",
         "- `dcpg_crdt_demo.json` (if enabled)",
         "- `rl_reward_stats.json` (if enabled)",
-        "- `sample_dag.dot` / `sample_dag.json`",
-        "- `privacy_utility_curve.png` (if matplotlib installed)",
+        "- `sample_dag.dot` / `sample_dag.json` / `sample_dag.png`",
+        "- `privacy_utility_curve.png`",
         "",
     ]
     (RESULTS_DIR / "EXPERIMENT_REPORT.md").write_text("\n".join(lines), encoding="utf-8")
@@ -679,8 +679,11 @@ def main() -> None:
             f.write(json.dumps(row) + "\n")
 
     # Plot (optional)
+    plot_saved = False
     try:
-        import matplotlib.pyplot as plt  # noqa: F401
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
 
         xs = [r["leak_total"] for r in metrics_rows]
         ys = [r["utility_proxy"] for r in metrics_rows]
@@ -695,6 +698,62 @@ def main() -> None:
         plt.title("Privacy-Utility Tradeoff (Synthetic Multimodal Stream)")
         plt.tight_layout()
         plt.savefig(RESULTS_DIR / "privacy_utility_curve.png", dpi=160)
+        plt.close()
+        plot_saved = True
+    except Exception:
+        pass
+
+    # DAG visualization (optional)
+    dag_png_saved = False
+    try:
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+
+        from .flow_controller import PolicyContract, build_dag
+
+        sample_contract = PolicyContract(
+            modality="text", chosen_policy="pseudo", risk_score=0.8, policy_version="v1"
+        )
+        dag = build_dag(sample_contract)
+
+        fig, ax = plt.subplots(figsize=(8, 4))
+        ax.set_xlim(0, 10)
+        ax.set_ylim(0, 4)
+        ax.axis("off")
+        ax.set_title("Sample Masking DAG (text / pseudo / risk=0.8)", fontsize=11)
+
+        node_positions = {}
+        n = len(dag.nodes)
+        for i, node in enumerate(dag.nodes):
+            x = 1.5 + i * (7.0 / max(n - 1, 1))
+            y = 2.0
+            node_positions[node.node_id] = (x, y)
+            color = "#cfe2f3" if not node.fallback else "#f9dbc8"
+            ls = "dashed" if node.fallback else "solid"
+            bbox = dict(boxstyle="round,pad=0.3", fc=color, ec="gray", lw=1.2, linestyle=ls)
+            label = f"{node.cmo_name}\n({node.policy})"
+            if node.predicate:
+                label += f"\n[{node.predicate}]"
+            ax.text(x, y, label, ha="center", va="center", fontsize=8, bbox=bbox)
+
+        for edge in dag.edges:
+            if edge.src in node_positions and edge.dst in node_positions:
+                x0, y0 = node_positions[edge.src]
+                x1, y1 = node_positions[edge.dst]
+                ax.annotate(
+                    "",
+                    xy=(x1, y1),
+                    xytext=(x0, y0),
+                    arrowprops=dict(arrowstyle="->", color="gray", lw=1.2),
+                )
+                mx, my = (x0 + x1) / 2, (y0 + y1) / 2 + 0.15
+                ax.text(mx, my, edge.label, ha="center", va="bottom", fontsize=7, color="gray")
+
+        plt.tight_layout()
+        plt.savefig(RESULTS_DIR / "sample_dag.png", dpi=120)
+        plt.close()
+        dag_png_saved = True
     except Exception:
         pass
 
@@ -713,12 +772,31 @@ def main() -> None:
 
     print("\nResults written to:", RESULTS_DIR)
     print(f"\nCross-modal synergy triggered localized retokenization {remask_count} time(s).")
+
+    # Print metrics table
+    print("\n--- Policy Metrics ---")
+    header = f"{'Policy':<10} {'Leak Total':>12} {'Utility Proxy':>14} {'Mean Lat (ms)':>14} {'P90 Lat (ms)':>13}"
+    print(header)
+    print("-" * len(header))
+    for r in metrics_rows:
+        print(
+            f"{r['policy']:<10} {r['leak_total']:>12.4f} {r['utility_proxy']:>14.6f}"
+            f" {r['mean_latency_ms']:>14.3f} {r['p90_latency_ms']:>13.3f}"
+        )
+
     print("\nOutputs:")
     print("  policy_metrics.csv")
     print("  latency_summary.csv")
     print("  audit_log.jsonl")
     print("  EXPERIMENT_REPORT.md")
-    print("  privacy_utility_curve.png (if matplotlib installed)")
+    if plot_saved:
+        print("  privacy_utility_curve.png  [saved]")
+    else:
+        print("  privacy_utility_curve.png  [not saved]")
+    if dag_png_saved:
+        print("  sample_dag.png             [saved]")
+    else:
+        print("  sample_dag.png             [not saved]")
     print("  plus additional adaptive artifacts (if optional modules enabled)")
 
 

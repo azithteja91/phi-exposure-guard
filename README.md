@@ -64,7 +64,8 @@ Outputs include:
 - `latency_summary.csv`
 - `audit_log.jsonl`
 - `EXPERIMENT_REPORT.md`
-- `privacy_utility_curve.png` (if matplotlib is available)
+- `privacy_utility_curve.png`
+- `sample_dag.png`
 
 All experiments are reproducible from source using synthetic data generated within the repository.
 

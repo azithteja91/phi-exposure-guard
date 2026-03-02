@@ -1,8 +1,8 @@
-{"checkpoint_id": "cp_0000", "timestamp": 1772465324.4261532, "record_count": 50, "merkle_root": "62a3f0a1dea57a0c9d05b77fc13e7ead868d369ec838e57e2281efa47f8b5896"}
-{"checkpoint_id": "cp_0001", "timestamp": 1772465324.4519145, "record_count": 50, "merkle_root": "f4d11a2ccfa132f00651180db679121eb737290e123304b66c50c7845aaae64f"}
-{"checkpoint_id": "cp_0002", "timestamp": 1772465324.4765594, "record_count": 50, "merkle_root": "7bb2232e75b64d9f8e0082125f949365684e19e4a622fae5f7420af8a30f5249"}
-{"checkpoint_id": "cp_0003", "timestamp": 1772465324.4971526, "record_count": 50, "merkle_root": "a0e001772dc35f08b629a683cfa6d61f7d92ff3eff5cd8bc4eda39ed227557af"}
-{"checkpoint_id": "cp_0004", "timestamp": 1772465324.5140066, "record_count": 50, "merkle_root": "4ac4d8a96a425b2f5f29c6aeebae0e3b8c98ef46403a8407aec02267b221447b"}
-{"checkpoint_id": "cp_0005", "timestamp": 1772465324.533817, "record_count": 50, "merkle_root": "8fbaf8fdb19de04d65b3a482464b4c3bf4d5e5ed78cf648b5d3e8c62852c7823"}
-{"checkpoint_id": "cp_0006", "timestamp": 1772465324.555853, "record_count": 50, "merkle_root": "1a1a4ad46fe49ee9d2ea401296354dce7717eb5051d55e76b82672e6bb9d4492"}
-{"checkpoint_id": "cp_0007", "timestamp": 1772465324.571975, "record_count": 40, "merkle_root": "ef7c2b70d29130f9ee246c5ba8872bbd514be25d0a6ccf675c856a954b3c6c0b"}
+{"checkpoint_id": "cp_0000", "timestamp": 1772465617.8869965, "record_count": 50, "merkle_root": "db53ecd91baf436ad04ed51c1d0742e6c35094dc07ccdb17d3774fc238854807"}
+{"checkpoint_id": "cp_0001", "timestamp": 1772465617.9129863, "record_count": 50, "merkle_root": "ed79b84c445fa97c68e564f0c718afc94953e2fef7326d9370df215cbefd105b"}
+{"checkpoint_id": "cp_0002", "timestamp": 1772465617.9373872, "record_count": 50, "merkle_root": "665716f9fb7157de826312aa745a1e04a225bdceea835995705f608937fd5de1"}
+{"checkpoint_id": "cp_0003", "timestamp": 1772465617.9575734, "record_count": 50, "merkle_root": "edd19dd2e0dd6f37294c161f247c305def1ef1f0dfd1b44f48cb35b6e08a7d26"}
+{"checkpoint_id": "cp_0004", "timestamp": 1772465617.9744036, "record_count": 50, "merkle_root": "ce5bb4c2305ffb80cb0415d10e2c3d97f028efc1d8b8a4df5289d2910f54da1c"}
+{"checkpoint_id": "cp_0005", "timestamp": 1772465617.9942021, "record_count": 50, "merkle_root": "b8032c868d3bc5ac54c991bbda91dfc25a42bcd522251fdddcd4228541e648a7"}
+{"checkpoint_id": "cp_0006", "timestamp": 1772465618.0160742, "record_count": 50, "merkle_root": "26b09f482d29bdf865386a5fd6bff08f86338771e4dcf736b143b1c9341297f7"}
+{"checkpoint_id": "cp_0007", "timestamp": 1772465618.0320706, "record_count": 40, "merkle_root": "698f65c184ba69b09294d267d1f38a42910f1435734577f1308bf7a0593bd17d"}
