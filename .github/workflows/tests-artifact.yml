@@ -4,6 +4,7 @@ on:
   push:
     branches: [ main, master, work ]
   pull_request:
+  workflow_dispatch:
 
 jobs:
   test-and-artifacts:
@@ -32,6 +33,13 @@ jobs:
       - name: Generate markdown test report
         run: |
           python scripts/generate_test_report.py .artifacts/pytest.xml TEST_RESULTS.md
+
+      - name: Debug files (important)
+        run: |
+          ls -la
+          ls -la .artifacts
+          wc -c .artifacts/pytest.xml TEST_RESULTS.md
+          sed -n '1,40p' TEST_RESULTS.md
 
       - name: Upload test artifacts
         uses: actions/upload-artifact@v4
