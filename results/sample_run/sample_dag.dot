@@ -1,6 +1,0 @@
-digraph masking_2bd28f88 {
-  rankdir=LR;
-  main_cmo [label="PseudonymizeID\n(pseudo)" shape=box ];
-  fallback_redact [label="RedactTextSpan\n(redact)" shape=box style=dashed,];
-  main_cmo -> fallback_redact [label="on_error"];
-}
