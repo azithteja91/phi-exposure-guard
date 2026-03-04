@@ -3,23 +3,68 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "amphi-rl-dpgraph"
+name = "phi-exposure-guard"
 version = "0.1.0"
-description = "Adaptive de-identification pipeline with exposure-aware policy control and DCPG utilities."
+description = "Stateful, exposure-aware de-identification for multimodal streaming healthcare data with adaptive RL policy control."
 readme = "README.md"
 requires-python = ">=3.9"
 license = { file = "LICENSE" }
 authors = [{ name = "VKAT Ganti" }]
-dependencies = []
+
+keywords = [
+    "de-identification",
+    "PHI",
+    "HIPAA",
+    "healthcare-privacy",
+    "streaming",
+    "reinforcement-learning",
+    "multimodal",
+    "NLP",
+    "clinical-NLP",
+    "privacy-preserving-ml",
+    "risk-graph",
+    "adaptive-masking",
+    "exposure-aware"
+]
+
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Healthcare Industry",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering :: Medical Science Apps.",
+    "Topic :: Security",
+    "Topic :: Text Processing :: Linguistic",
+    "Development Status :: 3 - Alpha",
+]
+
+dependencies = [
+    "numpy>=1.23",
+    "scikit-learn>=1.2",
+    "matplotlib>=3.7",
+]
 
 [project.optional-dependencies]
 crypto = ["cryptography>=41"]
-metrics = ["scikit-learn>=1.2"]
 ml = ["sentence-transformers>=2.2"]
-image = ["numpy>=1.23"]
-plot = ["matplotlib>=3.7"]
 rl = ["torch>=2.0"]
 dev = ["pytest>=7.4", "ruff>=0.4", "mypy>=1.8"]
+all = [
+    "cryptography>=41",
+    "sentence-transformers>=2.2",
+    "torch>=2.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/azithteja91/amphi_rl_dpgraph"
+Documentation = "https://github.com/azithteja91/amphi_rl_dpgraph#readme"
+"Bug Tracker" = "https://github.com/azithteja91/amphi_rl_dpgraph/issues"
+"Research Paper" = "https://github.com/azithteja91/amphi_rl_dpgraph/blob/main/patent"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
