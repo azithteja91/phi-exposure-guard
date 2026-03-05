@@ -690,9 +690,17 @@ def main() -> None:
         labels = [r["policy"] for r in metrics_rows]
 
         plt.figure()
-        plt.scatter(xs, ys)
+        plt.scatter(xs, ys, s=100)
+        offsets = {
+            "raw": (6, 6),
+            "weak": (6, 6),
+            "pseudo": (-50, 8),
+            "redact": (6, -14),
+            "adaptive": (6, 8),
+        }
         for x, y, label in zip(xs, ys, labels):
-            plt.annotate(label, (x, y), textcoords="offset points", xytext=(6, 6))
+            ox, oy = offsets.get(label, (6, 6))
+            plt.annotate(label, (x, y), textcoords="offset points", xytext=(ox, oy), fontsize=10)
         plt.xlabel("Privacy leakage (lower is better)")
         plt.ylabel("Utility proxy (higher is better)")
         plt.title("Privacy-Utility Tradeoff (Synthetic Multimodal Stream)")
