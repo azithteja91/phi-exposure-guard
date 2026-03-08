@@ -35,11 +35,11 @@ PHI_PATTERN = re.compile(
     r"("
     r"\b\d{7,10}\b"
     r"|\b\d{2}/\d{2}/\d{4}\b"
-    r"|\b\d{4}-\d{2}-\d{2}\b"                         )
+    r"|\b\d{4}-\d{2}-\d{2}\b"
     r"|Patient:\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?\b"
     r"|\bpatient\s+(?!" + _PSEUDO_PREFIXES + r")" + _NAME + r"(?:\s+" + _NAME + r")?\b"
     r"|\bmrn\b\s*(?!ID_" + PATIENT_TOKEN_PREFIX + r")[0-9 ]{6,12}\b"
-    r"|\bMRN\d{4,}\b"                                  
+    r"|\bMRN\d{4,}\b"
     r")",
     re.IGNORECASE,
 )
