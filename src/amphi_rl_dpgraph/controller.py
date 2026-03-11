@@ -88,8 +88,10 @@ class ExposurePolicyController:
     def decide_from_risk(self, risk_pre: float) -> Decision:
         if risk_pre < self.risk_1:
             pol, reason = "weak", "low risk"
+        elif risk_pre < (self.risk_1 + self.risk_2) / 2:
+            
         elif risk_pre < self.risk_2:
-            pol, reason = "pseudo", "medium risk"
+            pol, reason = "pseudo", "medium-high risk — pseudonymization"
         else:
             pol, reason = "redact", "high risk"
 
@@ -104,8 +106,9 @@ class ExposurePolicyController:
                 "risk_1": self.risk_1,
                 "risk_2": self.risk_2,
                 "remask_thresh": self.remask_thresh,
+                "synthetic_band": (self.risk_1, (self.risk_1 + self.risk_2) / 2),
             },
-            candidates=["weak", "pseudo", "redact"],
+            candidates=["weak", "synthetic", "pseudo", "redact"],
         )
 
     def record_and_decide(
@@ -118,17 +121,7 @@ class ExposurePolicyController:
         link_signals: Optional[Dict[str, int]] = None,
         event_payloads: Optional[Dict[str, Any]] = None,
     ) -> Decision:
-        """
-        Full pipeline per event:
-          1. Record exposures and score risk.
-          2. Run cross-modal embedding similarity check on new payloads.
-          3. Decide policy from risk score.
-          4. Check localized remask threshold.
-
-        Cross-modal matches are surfaced in Decision.cross_modal_matches and
-        included in the risk escalation path: if similarity is detected and
-        risk is below risk_2, policy escalates to pseudo regardless of threshold.
-        """
+        
         pk = str(patient_key)
         eid = str(event_id)
         ts = float(timestamp)
