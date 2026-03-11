@@ -89,9 +89,9 @@ class ExposurePolicyController:
         if risk_pre < self.risk_1:
             pol, reason = "weak", "low risk"
         elif risk_pre < (self.risk_1 + self.risk_2) / 2:
-            
+            pol, reason = "synthetic", "medium-low risk: synthetic PHI replacement"
         elif risk_pre < self.risk_2:
-            pol, reason = "pseudo", "medium-high risk — pseudonymization"
+            pol, reason = "pseudo", "medium-high risk: pseudonymization"
         else:
             pol, reason = "redact", "high risk"
 
