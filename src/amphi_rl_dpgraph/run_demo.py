@@ -349,6 +349,18 @@ def run_policy(policy_run: str) -> Tuple[dict, dict, List[dict]]:
         if audit_chain:
             audit_chain.register_cmo_version(CMORegistry.list_operators(), policy_version="v1")
 
+        # Warm up the embedding model before timing begins.
+        # DCPGAdapter lazily initialises sentence-transformers on the first
+        # cross_modal_match() call, which takes 100-400 ms (model load + JIT).
+        # Without warmup that spike lands in the first timed event and inflates
+        # mean_latency by ~100x vs the true steady-state P50.
+        try:
+            print("[warmup] loading embedding model ...", flush=True)
+            graph_adapter.cross_modal_match("__warmup__", "text", "warmup probe")
+            print("[warmup] done", flush=True)
+        except Exception:
+            pass
+
         # Seed AUROC with synthetic masked examples if cmo_media exists
         try:
             from .cmo_media import apply_synthetic_replacement as _synth_replace
