@@ -31,18 +31,18 @@ _PSEUDO_PREFIXES = rf"(?:{PATIENT_TOKEN_PREFIX}|ID_{PATIENT_TOKEN_PREFIX})"
 
 _NAME = r"[a-z]{2,}"
 
-PHI_PATTERN = re.compile(
+_pattern_str = (
     r"("
     r"\b\d{7,10}\b"
     r"|\b\d{2}/\d{2}/\d{4}\b"
     r"|\b\d{4}-\d{2}-\d{2}\b"
     r"|Patient:\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?\b"
-    r"|\bpatient\s+(?!" + _PSEUDO_PREFIXES + r")" + _NAME + r"(?:\s+" + _NAME + r")?\b"
-    r"|\bmrn\b\s*(?!ID_" + PATIENT_TOKEN_PREFIX + r")[0-9 ]{6,12}\b"
-    r"|\bMRN\d{4,}\b"
-    r")",
-    re.IGNORECASE,
+    + r"|\bpatient\s+(?!" + _PSEUDO_PREFIXES + r")" + _NAME + r"(?:\s+" + _NAME + r")?\b"
+    + r"|\bmrn\b\s*(?!ID_" + PATIENT_TOKEN_PREFIX + r")[0-9 ]{6,12}\b"
+    + r"|\bMRN\d{4,}\b"
+    + r")"
 )
+PHI_PATTERN = re.compile(_pattern_str, re.IGNORECASE)
 
 def _synthetic_mrn(original_mrn: str) -> str:
     """Mirror of cmo_media.synthetic_mrn — kept local to avoid circular import."""
