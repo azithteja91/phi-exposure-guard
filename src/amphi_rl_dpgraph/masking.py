@@ -8,8 +8,23 @@ ResolvedPolicy = Literal["raw", "weak", "pseudo", "redact", "synthetic"]
 RE_PATIENT_FULL = re.compile(r"(Patient:\s*)([A-Z][a-z]+\s[A-Z][a-z]+)")
 RE_PATIENT_FIRST = re.compile(r"(Patient:\s*)([A-Z][a-z]+)\b")
 
-RE_DOB = re.compile(r"(DOB:\s*)(\d{2}/\d{2}/\d{4})")
-RE_MRN = re.compile(r"(MRN\s*)(\d{7,10})")
+# DOB: accept both colon and space separator ("DOB: ...", "DOB ...")
+RE_DOB = re.compile(r"(DOB[:\s]\s*)(\d{2}/\d{2}/\d{4})", re.IGNORECASE)
+
+# ISO date: 2045-07-04 — PHI_PATTERN catches these regardless of context
+RE_DATE_ISO = re.compile(r"\b(\d{4}-\d{2}-\d{2})\b")
+
+# Runs AFTER RE_DOB so it catches any remaining unredacted dates.
+RE_DATE_BARE = re.compile(r"\b(\d{2}/\d{2}/\d{4})\b")
+
+# MRN: two cases aligned with PHI_PATTERN's two MRN sub-expressions:
+#   1. "MRN <7-10 pure digits>"  (RE_MRN_DIGITS)
+#   2. "MRN<4+ alphanumeric chars>" — e.g. "MRN0000"  (RE_MRN_ALPHA)
+RE_MRN_DIGITS = re.compile(r"(MRN\s*)(\d{7,10})", re.IGNORECASE)
+RE_MRN_ALPHA  = re.compile(r"\b(MRN)([A-Z0-9]{4,})\b", re.IGNORECASE)
+
+# Keep the old name as an alias so any external callers don't break.
+RE_MRN = RE_MRN_DIGITS
 
 # Matches both "at <Facility>" and "to <Facility>" so synthetic stream text
 # ("admitted to Mercy Hospital Clinic Center") is correctly handled.
@@ -29,28 +44,32 @@ def mask_text_redact(text: str) -> str:
     t = str(text)
     t = RE_PATIENT_FULL.sub(r"\1[REDACTED]", t)
     t = RE_PATIENT_FIRST.sub(r"\1[REDACTED]", t)
-    t = RE_DOB.sub(r"\1[REDACTED]", t)
-    t = RE_MRN.sub(r"\1[REDACTED]", t)
+    t = RE_DOB.sub(r"\1[REDACTED]", t)          # "DOB: ..." and "DOB ..."
+    t = RE_MRN_DIGITS.sub(r"\1[REDACTED]", t)   # "MRN 1234567"
+    t = RE_MRN_ALPHA.sub(r"\1[REDACTED]", t)    # "MRN0000"
+    t = RE_DATE_ISO.sub("[REDACTED]", t)         # "2045-07-04"
+    t = RE_DATE_BARE.sub("[REDACTED]", t)        # bare "01/01/1970" not caught above
     t = RE_FACILITY.sub(r"\1[REDACTED]", t)
     return _normalize_spaces(t)
 
 
 def mask_text_weak(text: str) -> str:
     t = str(text)
-    t = RE_DOB.sub(r"\1[REDACTED]", t)
+    t = RE_DOB.sub(r"\1[REDACTED]", t)    # "DOB: ..." and "DOB ..."
+    t = RE_DATE_ISO.sub("[REDACTED]", t)  # ISO dates
+    t = RE_DATE_BARE.sub("[REDACTED]", t) # bare slash dates
     return _normalize_spaces(t)
 
 
 def mask_text_pseudo(text: str, patient_token: str) -> str:
-    """
-    Stable pseudonymisation. patient_token includes version suffix so output
-    changes after localized retokenization: PATIENT_123_V0 -> PATIENT_123_V1.
-    """
     t = str(text)
     t = RE_PATIENT_FULL.sub(lambda m: f"{m.group(1)}{patient_token}", t)
     t = RE_PATIENT_FIRST.sub(lambda m: f"{m.group(1)}{patient_token}", t)
-    t = RE_DOB.sub(r"\1DATE_TOKEN", t)
-    t = RE_MRN.sub(lambda m: f"{m.group(1)}ID_{patient_token}", t)
+    t = RE_DOB.sub(r"\1DATE_TOKEN", t)                             # "DOB: ..." and "DOB ..."
+    t = RE_MRN_DIGITS.sub(lambda m: f"{m.group(1)}ID_{patient_token}", t)
+    t = RE_MRN_ALPHA.sub(lambda m: f"{m.group(1)}ID_{patient_token}", t)  # "MRN0000"
+    t = RE_DATE_ISO.sub("DATE_TOKEN", t)                           # ISO dates
+    t = RE_DATE_BARE.sub("DATE_TOKEN", t)                          # bare slash dates
     # Strip "Patient:" label so PHI_PATTERN cannot fire on the token itself.
     t = re.sub(r"Patient:\s*", "Subject: ", t)
     return _normalize_spaces(t)
