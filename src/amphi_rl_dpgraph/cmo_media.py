@@ -23,7 +23,9 @@ _RE_PATIENT_FULL = re.compile(r"((?:Patient|patient)[:\s]+)([A-Z][a-z]+\s[A-Z][a
 _RE_PATIENT_SOLO = re.compile(r"((?:Patient|patient)[:\s]+)([A-Z][a-z]+)\b")
 _RE_ASR_SOLO = re.compile(r"(\bpatient\s+)([a-z]{2,})\b", re.IGNORECASE)
 _RE_DATE = re.compile(r"\b(\d{2})/(\d{2})/(\d{4})\b")
+_RE_DATE_ISO = re.compile(r"\b(\d{4})-(\d{2})-(\d{2})\b")  # e.g. 2045-07-04
 _RE_MRN_LABELLED = re.compile(r"(MRN\s*)(\d{7,10})", re.IGNORECASE)
+_RE_MRN_ALPHA = re.compile(r"\b(MRN)([A-Z0-9]{4,})\b", re.IGNORECASE)  # e.g. MRN0000
 _RE_MRN_BARE = re.compile(r"\b(\d{7,10})\b")
 
 
@@ -58,7 +60,7 @@ def synthetic_date(date_str: str) -> str:
     """
     Replace a real date with a deterministic synthetic date from the pool.
     Same input always produces the same synthetic date (cross-modal co-reference
-    preserved). Pool dates are set in 2033-2075 - implausible as real patient
+    preserved). Pool dates are set in 2033-2075, which is implausible as real patient
     DOBs, clearly synthetic, but structurally valid MM/DD/YYYY dates.
     """
     idx = _deterministic_index(str(date_str), len(_SYNTHETIC_DATES))
@@ -70,7 +72,7 @@ def synthetic_mrn(original_mrn: str) -> str:
     Replace a real MRN with a deterministic synthetic MRN of the same digit length.
     Each digit position is independently permuted using a position-seeded hash so
     the synthetic value looks realistic (same length, all digits) but maps
-    consistently from the same input - preserving cross-modal co-reference.
+    consistently from the same input, preserving cross-modal co-reference.
     """
     digits = re.sub(r"\D", "", str(original_mrn))
     if not digits:
@@ -239,6 +241,7 @@ def replace_names_synthetic(text: str) -> str:
 def replace_dates_synthetic(text: str) -> str:
     """
     Replace real dates with deterministic synthetic dates from the pool.
+    Handles both slash format (MM/DD/YYYY) and ISO format (YYYY-MM-DD).
     Pool dates are set in 2033-2075 - structurally valid MM/DD/YYYY but
     implausible as real patient DOBs, making them clearly synthetic and
     exemptable by phi_detector without breaking real PHI detection.
@@ -246,17 +249,34 @@ def replace_dates_synthetic(text: str) -> str:
     def _replace(m: re.Match) -> str:
         return synthetic_date(m.group(0))
 
-    return _RE_DATE.sub(_replace, str(text))
+    def _replace_iso(m: re.Match) -> str:
+        # Convert YYYY-MM-DD to MM/DD/YYYY for synthetic_date, then return
+        # a synthetic slash-format date so PHI_PATTERN no longer matches it.
+        original = f"{m.group(2)}/{m.group(3)}/{m.group(1)}"
+        return synthetic_date(original)
+
+    t = _RE_DATE.sub(_replace, str(text))
+    t = _RE_DATE_ISO.sub(_replace_iso, t)
+    return t
 
 
 def replace_mrns_synthetic(text: str) -> str:
     """
-    Replace MRN digit strings with synthetic equivalents of the same length.
-    Handles both labelled form ("MRN 12345678") and bare digit runs.
-    Labelled form is processed first so the label is preserved and the
-    digit group is replaced; bare form mops up any remaining digit runs.
+    Replace MRN strings with synthetic equivalents.
+    Handles three forms aligned with PHI_PATTERN:
+      - alphanumeric: "MRN0000"  -> "MRN<synthetic digits>"
+      - labelled:     "MRN 1234567" -> "MRN <synthetic digits>"
+      - bare:         any remaining 7-10 digit run
     """
     t = str(text)
+
+    # alphanumeric: "MRN0000" -> "MRN<synthetic>" (must run before labelled)
+    def _replace_alpha(m: re.Match) -> str:
+        digits = re.sub(r"[^0-9]", "", m.group(2))  # extract digit portion
+        synth = synthetic_mrn(digits) if digits else m.group(2)
+        return m.group(1) + synth
+
+    t = _RE_MRN_ALPHA.sub(_replace_alpha, t)
 
     # labelled: "MRN 12345678" -> "MRN 23456789"
     def _replace_labelled(m: re.Match) -> str:
@@ -273,12 +293,6 @@ def replace_mrns_synthetic(text: str) -> str:
 
 
 def apply_synthetic_replacement(text: str) -> str:
-    """
-    Combined synthetic PHI replacement pipeline.
-    Order matters: names first (before MRN so digit-only MRNs aren't confused
-    with name character runs), then MRNs, then dates last (dates contain digits
-    that must not be double-processed by the MRN replacer).
-    """
     t = replace_names_synthetic(text)
     t = replace_mrns_synthetic(t)
     t = replace_dates_synthetic(t)
