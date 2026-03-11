@@ -323,7 +323,8 @@ def main():
     ax.set_title("Risk: SQLite vs CRDT"); ax.set_xlabel("Event"); ax.set_ylabel("Risk"); ax.legend()
     fig.tight_layout(); fig.savefig(outdir / "crdt_vs_sqlite_risk.png", dpi=150); plt.close(fig)
 
-    corr = np.nan_to_num(np.corrcoef(modal_counts))
+    with np.errstate(invalid="ignore", divide="ignore"):
+        corr = np.nan_to_num(np.corrcoef(modal_counts))
     fig, ax = plt.subplots(); im = ax.imshow(corr, cmap="coolwarm"); plt.colorbar(im, ax=ax)
     ax.set_title("Multimodal PHI Correlation"); fig.tight_layout()
     fig.savefig(outdir / "multimodal_phi_correlation.png", dpi=150); plt.close(fig)
