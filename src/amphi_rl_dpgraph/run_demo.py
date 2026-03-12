@@ -110,9 +110,10 @@ def main():
     print("[ST]  Pre-warming SentenceTransformer...")
     try:
         from sentence_transformers import SentenceTransformer as _ST
-        _w = _ST("all-MiniLM-L6-v2")
-        _w.encode("warmup", show_progress_bar=False)
-        del _w
+        from .dcpg import _text_embedding
+        _warm_model = _ST("all-MiniLM-L6-v2")
+        _warm_model.encode("warmup", show_progress_bar=False)
+        _text_embedding._cache["st"] = _warm_model   # share with DCPGAdapter — no second load
         print("[ST]  Ready.\n")
     except Exception as _e:
         print(f"[ST]  Not available ({_e}) — n-gram fallback active.\n")
@@ -323,11 +324,22 @@ def main():
     ax.set_title("Risk: SQLite vs CRDT"); ax.set_xlabel("Event"); ax.set_ylabel("Risk"); ax.legend()
     fig.tight_layout(); fig.savefig(outdir / "crdt_vs_sqlite_risk.png", dpi=150); plt.close(fig)
 
-    with np.errstate(invalid="ignore", divide="ignore"):
-        corr = np.nan_to_num(np.corrcoef(modal_counts))
-    fig, ax = plt.subplots(); im = ax.imshow(corr, cmap="coolwarm"); plt.colorbar(im, ax=ax)
-    ax.set_title("Multimodal PHI Correlation"); fig.tight_layout()
-    fig.savefig(outdir / "multimodal_phi_correlation.png", dpi=150); plt.close(fig)
+
+    modal_labels = ["text", "asr", "image", "audio"]
+    variable_idx = [i for i, col in enumerate(modal_counts) if len(set(col)) > 1]
+    if len(variable_idx) >= 2:
+        variable_counts = [modal_counts[i] for i in variable_idx]
+        variable_labels = [modal_labels[i] for i in variable_idx]
+        with np.errstate(invalid="ignore", divide="ignore"):
+            corr = np.nan_to_num(np.corrcoef(variable_counts))
+        fig, ax = plt.subplots()
+        im = ax.imshow(corr, cmap="coolwarm", vmin=-1, vmax=1)
+        plt.colorbar(im, ax=ax)
+        ax.set_xticks(range(len(variable_labels))); ax.set_xticklabels(variable_labels)
+        ax.set_yticks(range(len(variable_labels))); ax.set_yticklabels(variable_labels)
+        ax.set_title("Multimodal PHI Correlation (variable modalities only)")
+        fig.tight_layout()
+        fig.savefig(outdir / "multimodal_phi_correlation.png", dpi=150); plt.close(fig)
 
     lat_sum = latency_summary(latencies)
 
