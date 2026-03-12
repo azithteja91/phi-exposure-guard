@@ -5,8 +5,8 @@ from typing import Literal
 ResolvedPolicy = Literal["raw", "weak", "pseudo", "redact", "synthetic"]
 
 # Text patterns
-RE_PATIENT_FULL = re.compile(r"(Patient:\s*)([A-Z][a-z]+\s[A-Z][a-z]+)")
-RE_PATIENT_FIRST = re.compile(r"(Patient:\s*)([A-Z][a-z]+)\b")
+RE_PATIENT_FULL = re.compile(r"(Patient[:\s]+)([A-Z][a-z]+\s[A-Z][a-z]+)")
+RE_PATIENT_FIRST = re.compile(r"(Patient[:\s]+)([A-Z][a-z]+)\b")
 
 # DOB: accept both colon and space separator ("DOB: ...", "DOB ...")
 RE_DOB = re.compile(r"(DOB[:\s]\s*)(\d{2}/\d{2}/\d{4})", re.IGNORECASE)
@@ -18,17 +18,15 @@ RE_DATE_ISO = re.compile(r"\b(\d{4}-\d{2}-\d{2})\b")
 # Runs AFTER RE_DOB so it catches any remaining unredacted dates.
 RE_DATE_BARE = re.compile(r"\b(\d{2}/\d{2}/\d{4})\b")
 
-# MRN: two cases aligned with PHI_PATTERN's two MRN sub-expressions:
-#   1. "MRN <7-10 pure digits>"  (RE_MRN_DIGITS)
-#   2. "MRN<4+ alphanumeric chars>" — e.g. "MRN0000"  (RE_MRN_ALPHA)
-RE_MRN_DIGITS = re.compile(r"(MRN\s*)(\d{7,10})", re.IGNORECASE)
+
+RE_MRN_DIGITS = re.compile(r"(MRN[-\s]*)(\d{7,10})", re.IGNORECASE)
 RE_MRN_ALPHA  = re.compile(r"\b(MRN)([A-Z0-9]{4,})\b", re.IGNORECASE)
 
 # Keep the old name as an alias so any external callers don't break.
 RE_MRN = RE_MRN_DIGITS
 
 # Matches both "at <Facility>" and "to <Facility>" so synthetic stream text
-# ("admitted to Mercy Hospital Clinic Center") is correctly handled.
+
 RE_FACILITY = re.compile(r"((?:at|to)\s*)([A-Za-z.\s]+(?:Hospital|Clinic|Center))")
 
 # ASR patterns (looser)
