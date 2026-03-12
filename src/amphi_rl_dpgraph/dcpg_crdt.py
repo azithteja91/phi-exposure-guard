@@ -152,18 +152,19 @@ class CRDTGraph:
             updated += 1
         return updated
 
-    def risk_for(self, patient_key: str, provisional_k: float = 0.30) -> float:
+    def risk_for(self, patient_key: str, provisional_k: float = 0.03) -> float:
+       
         patient_nodes = [n for n in self.nodes.values() if n.patient_key == patient_key]
         if not patient_nodes:
             return 0.0
 
         total_units = sum(n.total_phi_units for n in patient_nodes)
-        degree = len({n.modality for n in patient_nodes})
+        degree      = len({n.modality for n in patient_nodes})
+        k           = float(provisional_k)
 
-        k = float(provisional_k)
-        units_factor = 1.0 - math.exp(-k * float(total_units))
-        r = 1.0 - math.exp(-k * float(total_units)) * units_factor / (degree + 1.0)
-        return float(max(0.0, min(1.0, r)))
+        base       = 1.0 - math.exp(-k * float(total_units))
+        link_bonus = 0.10 * max(0, degree - 1)
+        return float(max(0.0, min(1.0, base + link_bonus)))
 
     def summary(self) -> Dict[str, Any]:
         return {
@@ -183,10 +184,7 @@ class CRDTGraph:
 
 
 def demo_federated_merge() -> Dict[str, Any]:
-    """
-    Demonstrates two edge devices independently recording exposures,
-    then merging their CRDT graphs to produce a unified risk view.
-    """
+    
     device_a = CRDTGraph(device_id="edge_device_A")
     device_b = CRDTGraph(device_id="edge_device_B")
 
