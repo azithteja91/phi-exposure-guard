@@ -1,6 +1,0 @@
-policy,leak_text_avg,leak_asr_avg,leak_image_avg,leak_waveform_avg,leak_audio_avg,leak_total,utility_proxy,mean_latency_ms,p50_latency_ms,p90_latency_ms
-raw,0.5128,0.5128,0.7436,0.5128,0.7436,3.0256,1.0,0.127,0.126,0.148
-weak,0.5128,0.0,0.7436,0.0,0.7436,2.0,0.512195,0.164,0.153,0.228
-pseudo,0.5128,0.0,0.0,0.0,0.0,0.5128,1.0,0.17,0.164,0.207
-redact,0.5128,0.0,0.0,0.0,0.0,0.5128,0.505051,0.168,0.169,0.195
-adaptive,0.359,0.0,0.1026,0.0,0.1026,0.5641,1.0,138.514,2.555,6.858
