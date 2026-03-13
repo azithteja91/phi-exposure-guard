@@ -1,3 +1,9 @@
+# ECDSA signing and Merkle checkpointing for the audit chain.
+# Each record is hashed and signed on append; every N records a Merkle
+# checkpoint is committed. Supports forensic replay by correlating an
+# event back to the graph snapshot and CMO registry version active at
+# that timestamp. Exports to raw JSONL or FHIR AuditEvent JSONL.
+
 from __future__ import annotations
 
 import hashlib
@@ -26,7 +32,6 @@ def generate_signing_key():
 def sign_record(record: Dict[str, Any], private_key: Any) -> str:
     canonical = json.dumps(record, sort_keys=True, default=str).encode("utf-8")
     if private_key is None:
-        # graceful degradation on edge devices without cryptography lib
         return hashlib.sha256(canonical).hexdigest()
     try:
         from cryptography.hazmat.primitives.asymmetric import ec
@@ -92,9 +97,7 @@ class AuditChain:
         self._entries: List[SignedAuditEntry] = []
         self._checkpoints: List[MerkleCheckpoint] = []
         self._pending_hashes: List[str] = []
-        # snapshot registry for forensic replay: snapshot_id -> snapshot dict
         self._snapshots: Dict[str, Dict[str, Any]] = {}
-        # versioned CMO registry snapshots for deterministic replay
         self._cmo_registry_versions: List[Dict[str, Any]] = []
 
     def append(self, record: Dict[str, Any]) -> SignedAuditEntry:
@@ -131,11 +134,9 @@ class AuditChain:
         return cp
 
     def register_snapshot(self, snapshot_id: str, snapshot_dict: Dict[str, Any]) -> None:
-        """Store a DCPG snapshot for later forensic replay lookup."""
         self._snapshots[snapshot_id] = snapshot_dict
 
     def register_cmo_version(self, cmo_set: List[str], policy_version: str) -> None:
-        """Record which CMOs were active at a given policy version."""
         self._cmo_registry_versions.append(
             {
                 "policy_version": policy_version,
@@ -145,26 +146,20 @@ class AuditChain:
         )
 
     def replay(self, event_id: str) -> Optional[Dict[str, Any]]:
-        """
-        Forensic replay: return the full audit entry for a given event_id
-        alongside the DCPG snapshot and CMO registry that were active at that time.
-        """
         entry = next((e for e in self._entries if e.record.get("event_id") == event_id), None)
         if entry is None:
             return None
 
         ts = float(entry.timestamp)
 
-        best_snap = None
-        best_snap_ts = 0.0
+        best_snap, best_snap_ts = None, 0.0
         for _, snap in self._snapshots.items():
             snap_ts = float(snap.get("timestamp", 0.0))
             if snap_ts <= ts and snap_ts > best_snap_ts:
                 best_snap = snap
                 best_snap_ts = snap_ts
 
-        best_cmo = None
-        best_cmo_ts = 0.0
+        best_cmo, best_cmo_ts = None, 0.0
         for cv in self._cmo_registry_versions:
             cv_ts = float(cv.get("timestamp", 0.0))
             if cv_ts <= ts and cv_ts > best_cmo_ts:
@@ -181,7 +176,6 @@ class AuditChain:
         }
 
     def to_fhir_audit_event(self, entry: SignedAuditEntry) -> Dict[str, Any]:
-        """Serialise a single audit entry as a FHIR AuditEvent resource."""
         rec = entry.record
         return {
             "resourceType": "AuditEvent",
@@ -272,7 +266,6 @@ class AuditChain:
                 )
 
     def export_fhir_jsonl(self, path: str) -> None:
-        """Export all entries as FHIR AuditEvent JSONL."""
         with open(path, "w", encoding="utf-8") as f:
             for e in self._entries:
                 f.write(json.dumps(self.to_fhir_audit_event(e), default=str) + "\n")

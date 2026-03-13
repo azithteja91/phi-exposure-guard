@@ -1,3 +1,10 @@
+# SQLite-backed patient exposure state and rolling risk model. risk_components
+# combines a units saturation factor, recency decay, and a cross-modal link
+# bonus into a single clamped risk score. localized_remask_trigger does
+# edge-detection on threshold crossings: it fires once when risk transitions
+# from below to above the threshold, increments the pseudonym version, and
+# writes an audit row to remask_events with the affected event IDs.
+
 from __future__ import annotations
 
 import json
@@ -22,26 +29,24 @@ class RiskComponents:
 
 
 class ContextState:
-    """SQLite-backed patient exposure state and rolling risk model."""
-
     def __init__(
         self,
         db_path: str,
         *,
         k_units: float = 0.05,
         recency_half_life_s: float = 120.0,
-        link_lookback_events: int = 20,  # increased so cross-modal links remain visible in snapshot
+        link_lookback_events: int = 20,
         link_bonus_two_modal: float = 0.20,
         link_bonus_three_modal: float = 0.30,
         provisional_k: float = 0.30,
     ) -> None:
-        self.db_path = str(db_path)
-        self.k_units = float(k_units)
-        self.recency_half_life_s = float(recency_half_life_s)
-        self.link_lookback_events = int(link_lookback_events)
-        self.link_bonus_two_modal = float(link_bonus_two_modal)
+        self.db_path               = str(db_path)
+        self.k_units               = float(k_units)
+        self.recency_half_life_s   = float(recency_half_life_s)
+        self.link_lookback_events  = int(link_lookback_events)
+        self.link_bonus_two_modal  = float(link_bonus_two_modal)
         self.link_bonus_three_modal = float(link_bonus_three_modal)
-        self.provisional_k = float(provisional_k)
+        self.provisional_k         = float(provisional_k)
 
         Path(self.db_path).parent.mkdir(parents=True, exist_ok=True)
         self._conn = sqlite3.connect(self.db_path)
@@ -55,10 +60,9 @@ class ContextState:
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
         self.close()
-        return None  # do not suppress exceptions
+        return None
 
     def __del__(self) -> None:
-        # Belt-and-suspenders fallback — context manager is preferred.
         try:
             self.close()
         except Exception:
@@ -141,7 +145,6 @@ class ContextState:
         return int(row["pseudonym_version"]) if row else 0
 
     def record_masking_credit(self, *, patient_key: str, masked_units: int) -> Dict[str, Any]:
-        """Masking credit reduces effective exposure, lowering future risk."""
         pk = str(patient_key)
         self._ensure_patient(pk)
         mu = max(0, int(masked_units))
@@ -154,18 +157,18 @@ class ContextState:
                 """,
                 (mu, pk),
             )
-        row = self._conn.execute(
+        row    = self._conn.execute(
             "SELECT total_phi_units, masked_credit_units FROM patient_state WHERE patient_key=?",
             (pk,),
         ).fetchone()
-        total = int(row["total_phi_units"]) if row else 0
+        total    = int(row["total_phi_units"]) if row else 0
         credited = int(row["masked_credit_units"]) if row else 0
         return {
-            "patient_key": pk,
+            "patient_key":          pk,
             "masked_units_applied": mu,
-            "total_phi_units": total,
-            "masked_credit_units": credited,
-            "effective_units": max(0, total - credited),
+            "total_phi_units":      total,
+            "masked_credit_units":  credited,
+            "effective_units":      max(0, total - credited),
         }
 
     def record_event(
@@ -177,9 +180,9 @@ class ContextState:
         modality_exposures: Dict[str, int],
         link_signals: Optional[Dict[str, int]] = None,
     ) -> None:
-        pk = str(patient_key)
-        eid = str(event_id)
-        now_ts = float(ts)
+        pk           = str(patient_key)
+        eid          = str(event_id)
+        now_ts       = float(ts)
         link_signals = dict(link_signals or {})
 
         self._ensure_patient(pk)
@@ -193,7 +196,7 @@ class ContextState:
                 base = str(link_mod).removesuffix("_link")
                 rows.append((pk, eid, now_ts, f"{base}_link", 1))
 
-        add_phi_units = sum(u for (_, _, _, m, u) in rows if not m.endswith("_link"))
+        add_phi_units  = sum(u for (_, _, _, m, u) in rows if not m.endswith("_link"))
         add_link_units = sum(u for (_, _, _, m, u) in rows if m.endswith("_link") and u > 0)
 
         with self._conn:
@@ -232,8 +235,8 @@ class ContextState:
         if not row:
             return 0.0
         last_ts = float(row["last_event_ts"] or 0.0)
-        now = time.time() if now_ts is None else float(now_ts)
-        age = max(0.0, now - last_ts)
+        now     = time.time() if now_ts is None else float(now_ts)
+        age     = max(0.0, now - last_ts)
         if self.recency_half_life_s <= 0:
             return 1.0
         return float(math.pow(0.5, age / self.recency_half_life_s))
@@ -282,12 +285,12 @@ class ContextState:
         self._ensure_patient(pk)
 
         effective_units = int(self._effective_units(pk))
-        units_factor = 1.0 - math.exp(-self.k_units * float(effective_units))
-        recency = float(self._recency_factor(pk, now_ts))
-        link_bonus = float(self._link_bonus(pk))
-        degree = int(self._degree(pk))
+        units_factor    = 1.0 - math.exp(-self.k_units * float(effective_units))
+        recency         = float(self._recency_factor(pk, now_ts))
+        link_bonus      = float(self._link_bonus(pk))
+        degree          = int(self._degree(pk))
 
-        raw = (0.8 * float(units_factor)) + (0.2 * float(recency)) + float(link_bonus)
+        raw  = (0.8 * float(units_factor)) + (0.2 * float(recency)) + float(link_bonus)
         risk = max(0.0, min(1.0, float(raw)))
         prov_risk = self._provisional_risk(effective_units, units_factor, degree)
 
@@ -315,17 +318,13 @@ class ContextState:
         lookback_events: int = 10,
         trigger_reason: str = "",
     ) -> Dict[str, Any]:
-        """
-        Increment pseudonym version if risk crosses threshold.
-        Edge-detection: fires once on crossing, not repeatedly while above threshold.
-        """
-        pk = str(patient_key)
-        eid = str(event_id)
+        pk     = str(patient_key)
+        eid    = str(event_id)
         now_ts = float(ts)
         self._ensure_patient(pk)
 
         comps = self.risk_components(pk, now_ts=now_ts)
-        risk = float(comps.risk)
+        risk  = float(comps.risk)
 
         prev_row = self._conn.execute(
             "SELECT last_risk FROM last_risk WHERE patient_key=?",
@@ -343,14 +342,14 @@ class ContextState:
 
         if not crossed:
             return {
-                "trigger": False,
-                "risk": float(risk),
-                "provisional_risk": float(comps.provisional_risk),
-                "threshold": float(threshold),
+                "trigger":           False,
+                "risk":              float(risk),
+                "provisional_risk":  float(comps.provisional_risk),
+                "threshold":         float(threshold),
                 "affected_event_ids": [],
-                "old_version": None,
-                "new_version": None,
-                "trigger_reason": "",
+                "old_version":       None,
+                "new_version":       None,
+                "trigger_reason":    "",
             }
 
         rows = self._conn.execute(
@@ -410,12 +409,12 @@ class ContextState:
             )
 
         return {
-            "trigger": True,
-            "risk": float(risk),
-            "provisional_risk": float(comps.provisional_risk),
-            "threshold": float(threshold),
+            "trigger":            True,
+            "risk":               float(risk),
+            "provisional_risk":   float(comps.provisional_risk),
+            "threshold":          float(threshold),
             "affected_event_ids": affected,
-            "old_version": int(old_v),
-            "new_version": int(new_v),
-            "trigger_reason": str(trigger_reason),
+            "old_version":        int(old_v),
+            "new_version":        int(new_v),
+            "trigger_reason":     str(trigger_reason),
         }

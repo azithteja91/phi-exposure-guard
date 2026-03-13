@@ -1,13 +1,23 @@
+# DAG-based masking pipeline compiler. build_dag() compiles a PolicyContract into a
+# MaskingDAG (nodes = CMOs, edges = fallback/error paths) and caches by contract hash.
+# High-risk image contracts get a branching DAG; all others get main + fallback_redact.
+# build_pipeline() returns a callable that executes the DAG via apply_masking() with
+# automatic CMO fallback to redact on error. Failure counts are tracked per CMO name.
+
 from __future__ import annotations
 
 import json
+import logging as _logging
+from collections import defaultdict as _defaultdict
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Literal, Optional
 
 from .masking_ops import apply_masking
+from .consent import _POLICY_RANK
 
 Modality       = Literal["text", "asr", "image_proxy", "waveform_proxy", "audio_proxy"]
 ResolvedPolicy = Literal["raw", "weak", "pseudo", "redact", "synthetic"]
+
 
 @dataclass(frozen=True)
 class PolicyContract:
@@ -16,7 +26,8 @@ class PolicyContract:
     patient_token: str = "PATIENT_0_V0"
     risk_score: float = 0.0
     consent_level: str = "standard"
-    policy_version: str = "v1"  # cache key
+    policy_version: str = "v1"
+
 
 @dataclass
 class DAGNode:
@@ -27,11 +38,13 @@ class DAGNode:
     predicate: Optional[str] = None
     fallback: bool = False
 
+
 @dataclass
 class DAGEdge:
     src: str
     dst: str
     label: str = ""
+
 
 @dataclass
 class MaskingDAG:
@@ -42,9 +55,9 @@ class MaskingDAG:
     def to_dot(self) -> str:
         lines = [f'digraph masking_{self.contract_hash[:8]} {{', '  rankdir=LR;']
         for n in self.nodes:
-            label  = f"{n.cmo_name}\\n({n.policy})"
-            shape  = "diamond" if n.predicate else "box"
-            style  = 'style=dashed,' if n.fallback else ''
+            label = f"{n.cmo_name}\\n({n.policy})"
+            shape = "diamond" if n.predicate else "box"
+            style = 'style=dashed,' if n.fallback else ''
             lines.append(f'  {n.node_id} [label="{label}" shape={shape} {style}];')
         for e in self.edges:
             lbl = f' [label="{e.label}"]' if e.label else ""
@@ -58,12 +71,8 @@ class MaskingDAG:
                 "contract_hash": self.contract_hash,
                 "nodes": [
                     {
-                        "id": n.node_id,
-                        "cmo": n.cmo_name,
-                        "modality": n.modality,
-                        "policy": n.policy,
-                        "predicate": n.predicate,
-                        "fallback": n.fallback,
+                        "id": n.node_id, "cmo": n.cmo_name, "modality": n.modality,
+                        "policy": n.policy, "predicate": n.predicate, "fallback": n.fallback,
                     }
                     for n in self.nodes
                 ],
@@ -71,6 +80,7 @@ class MaskingDAG:
             },
             indent=2,
         )
+
 
 _POLICY_CMO: Dict[str, Dict[str, str]] = {
     "text": {
@@ -86,7 +96,7 @@ _POLICY_CMO: Dict[str, Dict[str, str]] = {
     "image_proxy": {
         "raw": "PassThrough", "weak": "BlurImageRegion",
         "pseudo": "BlurImageRegion", "redact": "RedactImageOverlay",
-        "synthetic": "BlurImageRegion",   # same as pseudo
+        "synthetic": "BlurImageRegion",
     },
     "waveform_proxy": {
         "raw": "PassThrough", "weak": "MaskWaveformHeader",
@@ -101,20 +111,19 @@ _POLICY_CMO: Dict[str, Dict[str, str]] = {
 }
 
 _CONSENT_POLICY_CAP: Dict[str, str] = {
-    "minimal":  "raw",     # opt out
-    "research": "pseudo",  # pseudo ok
-    "standard": "redact",  # full ok
+    "minimal":  "raw",
+    "research": "pseudo",
+    "standard": "redact",
     "full":     "redact",
 }
 
-_POLICY_RANK = {"raw": 0, "weak": 1, "pseudo": 2, "synthetic": 2, "redact": 3}
 
 def _apply_consent_cap(policy: str, consent_level: str) -> str:
-    """Consent cap."""
     cap = _CONSENT_POLICY_CAP.get(consent_level, "redact")
     if _POLICY_RANK.get(policy, 0) > _POLICY_RANK.get(cap, 3):
         return cap
     return policy
+
 
 def _contract_hash(contract: PolicyContract) -> str:
     import hashlib
@@ -124,13 +133,12 @@ def _contract_hash(contract: PolicyContract) -> str:
     )
     return hashlib.sha256(key.encode()).hexdigest()[:16]
 
+
 _DAG_CACHE: Dict[str, MaskingDAG] = {}
 _DAG_CACHE_MAX = 128
 
+
 def build_dag(contract: PolicyContract) -> MaskingDAG:
-    """
-    Compile DAG.
-    """
     ch = _contract_hash(contract)
     if ch in _DAG_CACHE:
         return _DAG_CACHE[ch]
@@ -183,10 +191,18 @@ def build_dag(contract: PolicyContract) -> MaskingDAG:
     _DAG_CACHE[ch] = dag
     return dag
 
+
+_cmo_failure_counts: dict = _defaultdict(int)
+
+
+def cmo_failure_summary() -> dict:
+    return dict(_cmo_failure_counts)
+
+
 def build_pipeline(contract: PolicyContract) -> Callable[[Any, str], Any]:
-    """Build pipeline."""
-    dag = build_dag(contract)
+    build_dag(contract)
     effective_policy = _apply_consent_cap(contract.chosen_policy, contract.consent_level)
+    cmo_name = _POLICY_CMO.get(contract.modality, {}).get(effective_policy, "RedactTextSpan")
 
     def pipeline(payload: Any, patient_token: str = "PATIENT_0_V0") -> Any:
         try:
@@ -196,7 +212,9 @@ def build_pipeline(contract: PolicyContract) -> Callable[[Any, str], Any]:
                 payload=payload,
                 patient_token=patient_token,
             )
-        except Exception:
+        except Exception as exc:
+            _cmo_failure_counts[cmo_name] += 1
+            _logging.warning("CMO %s failed (%s), falling back to redact", cmo_name, exc)
             return apply_masking(
                 modality=contract.modality,
                 policy="redact",
@@ -204,8 +222,9 @@ def build_pipeline(contract: PolicyContract) -> Callable[[Any, str], Any]:
                 patient_token=patient_token,
             )
 
-    pipeline._dag = dag  # type: ignore
+    pipeline._dag = build_dag(contract)  # type: ignore
     return pipeline
+
 
 def export_dag(contract: PolicyContract, fmt: str = "dot") -> str:
     dag = build_dag(contract)

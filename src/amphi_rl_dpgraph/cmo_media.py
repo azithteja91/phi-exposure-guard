@@ -1,10 +1,14 @@
+# CMO media transforms for PHI-bearing payloads across text, image, audio, and
+# waveform modalities. Synthetic replacement functions use deterministic hashing
+# so the same input always maps to the same output, preserving cross-modal
+# co-reference. Image and audio CMOs fall back gracefully when numpy/cv2 are
+# absent. All regex patterns are module-level compiled constants.
+
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 import re
 import random
-
-## Synthetic name pool
 
 _SYNTHETIC_FIRST = [
     "Alex", "Blake", "Casey", "Dana", "Elliot", "Finley", "Gray", "Harper",
@@ -18,19 +22,18 @@ _SYNTHETIC_LAST = [
     "Quinn", "Reed", "Shaw", "Todd", "Upton", "Vane", "Ward", "Yates",
 ]
 
-_RE_NAME = re.compile(r"\b([A-Z][a-z]+)\s([A-Z][a-z]+)\b")
+_RE_NAME         = re.compile(r"\b([A-Z][a-z]+)\s([A-Z][a-z]+)\b")
 _RE_PATIENT_FULL = re.compile(r"((?:Patient|patient)[:\s]+)([A-Z][a-z]+\s[A-Z][a-z]+)")
 _RE_PATIENT_SOLO = re.compile(r"((?:Patient|patient)[:\s]+)([A-Z][a-z]+)\b")
-_RE_ASR_SOLO = re.compile(r"(\bpatient\s+)([a-z]{2,})\b", re.IGNORECASE)
-_RE_DATE = re.compile(r"\b(\d{2})/(\d{2})/(\d{4})\b")
-_RE_DATE_ISO = re.compile(r"\b(\d{4})-(\d{2})-(\d{2})\b")  # e.g. 2045-07-04
+_RE_ASR_SOLO     = re.compile(r"(\bpatient\s+)([a-z]{2,})\b", re.IGNORECASE)
+_RE_DATE         = re.compile(r"\b(\d{2})/(\d{2})/(\d{4})\b")
+_RE_DATE_ISO     = re.compile(r"\b(\d{4})-(\d{2})-(\d{2})\b")
 _RE_MRN_LABELLED = re.compile(r"(MRN\s*)(\d{7,10})", re.IGNORECASE)
-_RE_MRN_ALPHA = re.compile(r"\b(MRN)([A-Z0-9]{4,})\b", re.IGNORECASE)  # e.g. MRN0000
-_RE_MRN_BARE = re.compile(r"\b(\d{7,10})\b")
+_RE_MRN_ALPHA    = re.compile(r"\b(MRN)([A-Z0-9]{4,})\b", re.IGNORECASE)
+_RE_MRN_BARE     = re.compile(r"\b(\d{7,10})\b")
 
 
 def _deterministic_index(seed_str: str, pool_len: int) -> int:
-    """Stable index into a pool based on a seed string."""
     h = 0
     for c in seed_str:
         h = (h * 31 + ord(c)) & 0xFFFFFFFF
@@ -38,13 +41,10 @@ def _deterministic_index(seed_str: str, pool_len: int) -> int:
 
 
 def synthetic_name(original: str) -> str:
-    """Replace a real name with a consistent synthetic one derived from the original."""
     fi = _deterministic_index(original, len(_SYNTHETIC_FIRST))
     li = _deterministic_index(original[::-1], len(_SYNTHETIC_LAST))
     return f"{_SYNTHETIC_FIRST[fi]} {_SYNTHETIC_LAST[li]}"
 
-
-# Synthetic date pool
 
 _SYNTHETIC_DATES = [
     "01/15/2045", "03/22/2047", "07/04/2051", "11/11/2053", "02/28/2049",
@@ -57,40 +57,23 @@ _SYNTHETIC_DATES_SET: frozenset = frozenset(_SYNTHETIC_DATES)
 
 
 def synthetic_date(date_str: str) -> str:
-    """
-    Replace a real date with a deterministic synthetic date from the pool.
-    Same input always produces the same synthetic date (cross-modal co-reference
-    preserved). Pool dates are set in 2033-2075, which is implausible as real patient
-    DOBs, clearly synthetic, but structurally valid MM/DD/YYYY dates.
-    """
     idx = _deterministic_index(str(date_str), len(_SYNTHETIC_DATES))
     return _SYNTHETIC_DATES[idx]
 
 
 def synthetic_mrn(original_mrn: str) -> str:
-    """
-    Replace a real MRN with a deterministic synthetic MRN of the same digit length.
-    Each digit position is independently permuted using a position-seeded hash so
-    the synthetic value looks realistic (same length, all digits) but maps
-    consistently from the same input, preserving cross-modal co-reference.
-    """
     digits = re.sub(r"\D", "", str(original_mrn))
     if not digits:
         return original_mrn
     result = []
     for i, d in enumerate(digits):
-        seed = f"{original_mrn}:{i}"
-        # deterministic replacement digit - never produces the same digit as input
-        # (shift by 1-9 mod 10 to guarantee difference)
+        seed  = f"{original_mrn}:{i}"
         shift = (_deterministic_index(seed, 9) + 1)
         result.append(str((int(d) + shift) % 10))
     return "".join(result)
 
 
-# Image CMOs
-
 def apply_gaussian_blur(payload: Any, kernel_size: int = 15) -> Any:
-    """Blur PHI-bearing image regions. Accepts numpy (H,W,C) or integer proxy."""
     try:
         import numpy as np
         arr = np.asarray(payload, dtype=np.uint8)
@@ -100,14 +83,13 @@ def apply_gaussian_blur(payload: Any, kernel_size: int = 15) -> Any:
         except ImportError:
             pass
 
-        # numpy fallback box blur
         from numpy.lib.stride_tricks import sliding_window_view
-        k = max(3, kernel_size | 1)
+        k   = max(3, kernel_size | 1)
         pad = k // 2
         if arr.ndim == 3:
             out = np.zeros_like(arr)
             for c in range(arr.shape[2]):
-                ch = np.pad(arr[:, :, c], pad, mode="edge").astype(np.float32)
+                ch      = np.pad(arr[:, :, c], pad, mode="edge").astype(np.float32)
                 windows = sliding_window_view(ch, (k, k))
                 out[:, :, c] = windows.mean(axis=(-1, -2)).astype(np.uint8)
             return out
@@ -117,7 +99,6 @@ def apply_gaussian_blur(payload: Any, kernel_size: int = 15) -> Any:
 
 
 def redact_image_overlay(payload: Any) -> Any:
-    """Black-out entire image."""
     try:
         import numpy as np
         return np.zeros_like(np.asarray(payload, dtype=np.uint8))
@@ -136,10 +117,7 @@ def image_phi_flag(payload: Any, policy: str) -> int:
     return raw_flag
 
 
-# Audio / MFCC CMOs
-
 def shift_pitch(payload: Any, shift_factor: float = 1.15) -> Any:
-    """Scale MFCC spectral coefficients to obfuscate speaker identity."""
     try:
         import numpy as np
         arr = np.asarray(payload, dtype=np.float32)
@@ -178,10 +156,7 @@ def audio_phi_flag(payload: Any, policy: str) -> int:
     return raw_flag
 
 
-# Waveform header CMOs
-
 def mask_waveform_header(header: Any, patient_token: str = "PATIENT_0_V0") -> Any:
-    """Replace PHI fields in a waveform header dict; integer proxy always returns 0."""
     if isinstance(header, dict):
         phi_fields = {
             "patient_id", "patient_name", "mrn", "dob", "date_of_birth",
@@ -200,37 +175,24 @@ def waveform_phi_flag(payload: Any, policy: str) -> int:
     return raw_flag if policy == "raw" else 0
 
 
-# Synthetic replacement CMOs
-
 def replace_names_synthetic(text: str) -> str:
-    """
-    Replace real names with consistent synthetic names.
-    Handles three cases:
-    1. Full "First Last" anywhere in text -> synthetic full name
-    2. Single name after "Patient:" or "patient:" label -> synthetic first name
-    3. Single lowercase name after "patient " in ASR text -> synthetic first name
-    Deterministic mapping preserves cross-modal co-reference.
-    """
     t = str(text)
 
-    # 1. Full name replacement (must run before solo to avoid double-replacing)
     def _replace_full(m: re.Match) -> str:
         return synthetic_name(m.group(0))
 
     t = _RE_NAME.sub(_replace_full, t)
 
-    # 2. Solo name after "Patient: " or "patient: " (text note style)
     def _replace_patient_solo(m: re.Match) -> str:
         name = m.group(2)
-        fi = _deterministic_index(name, len(_SYNTHETIC_FIRST))
+        fi   = _deterministic_index(name, len(_SYNTHETIC_FIRST))
         return m.group(1) + _SYNTHETIC_FIRST[fi]
 
     t = _RE_PATIENT_SOLO.sub(_replace_patient_solo, t)
 
-    # 3. Solo lowercase name after "patient " in ASR
     def _replace_asr_solo(m: re.Match) -> str:
         name = m.group(2)
-        fi = _deterministic_index(name.lower(), len(_SYNTHETIC_FIRST))
+        fi   = _deterministic_index(name.lower(), len(_SYNTHETIC_FIRST))
         return m.group(1) + _SYNTHETIC_FIRST[fi].lower()
 
     t = _RE_ASR_SOLO.sub(_replace_asr_solo, t)
@@ -239,19 +201,10 @@ def replace_names_synthetic(text: str) -> str:
 
 
 def replace_dates_synthetic(text: str) -> str:
-    """
-    Replace real dates with deterministic synthetic dates from the pool.
-    Handles both slash format (MM/DD/YYYY) and ISO format (YYYY-MM-DD).
-    Pool dates are set in 2033-2075 - structurally valid MM/DD/YYYY but
-    implausible as real patient DOBs, making them clearly synthetic and
-    exemptable by phi_detector without breaking real PHI detection.
-    """
     def _replace(m: re.Match) -> str:
         return synthetic_date(m.group(0))
 
     def _replace_iso(m: re.Match) -> str:
-        # Convert YYYY-MM-DD to MM/DD/YYYY for synthetic_date, then return
-        # a synthetic slash-format date so PHI_PATTERN no longer matches it.
         original = f"{m.group(2)}/{m.group(3)}/{m.group(1)}"
         return synthetic_date(original)
 
@@ -261,30 +214,20 @@ def replace_dates_synthetic(text: str) -> str:
 
 
 def replace_mrns_synthetic(text: str) -> str:
-    """
-    Replace MRN strings with synthetic equivalents.
-    Handles three forms aligned with PHI_PATTERN:
-      - alphanumeric: "MRN0000"  -> "MRN<synthetic digits>"
-      - labelled:     "MRN 1234567" -> "MRN <synthetic digits>"
-      - bare:         any remaining 7-10 digit run
-    """
     t = str(text)
 
-    # alphanumeric: "MRN0000" -> "MRN<synthetic>" (must run before labelled)
     def _replace_alpha(m: re.Match) -> str:
-        digits = re.sub(r"[^0-9]", "", m.group(2))  # extract digit portion
-        synth = synthetic_mrn(digits) if digits else m.group(2)
+        digits = re.sub(r"[^0-9]", "", m.group(2))
+        synth  = synthetic_mrn(digits) if digits else m.group(2)
         return m.group(1) + synth
 
     t = _RE_MRN_ALPHA.sub(_replace_alpha, t)
 
-    # labelled: "MRN 12345678" -> "MRN 23456789"
     def _replace_labelled(m: re.Match) -> str:
         return m.group(1) + synthetic_mrn(m.group(2))
 
     t = _RE_MRN_LABELLED.sub(_replace_labelled, t)
 
-    # bare: any remaining 7-10 digit run
     def _replace_bare(m: re.Match) -> str:
         return synthetic_mrn(m.group(0))
 

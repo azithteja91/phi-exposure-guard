@@ -1,3 +1,10 @@
+# Runtime registry mapping masking operator names to CMOFunction callables.
+# Operators are registered at module import time on a class-level dict shared
+# across all CMORegistry instances. Execution logs are per-instance so test
+# runs and concurrent invocations stay isolated. apply_via_cmo is the primary
+# call site: it resolves policy to a CMO name, builds a DataBlock, runs the
+# operator, and returns the masked payload alongside a MaskingActionLog.
+
 from __future__ import annotations
 
 import hashlib
@@ -8,15 +15,12 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 try:
     from .masking_ops import apply_masking
 except ImportError:
-
     def apply_masking(*, modality, policy, payload, patient_token="PATIENT_0_V0"):  # type: ignore
         return payload
-
 
 try:
     from .cmo_media import apply_synthetic_replacement
 except ImportError:
-
     def apply_synthetic_replacement(text: str) -> str:  # type: ignore
         return text
 
@@ -62,21 +66,9 @@ CMOFunction = Callable[[DataBlock, MaskingPolicyContract], DataBlock]
 
 
 class CMORegistry:
-    """Runtime registry for masking operators.
-
-    The operator registry (``_registry``) is class-level: operators are
-    registered once at module import time and are intentionally shared.
-
-    Execution logs are instance-level: each ``CMORegistry()`` instance keeps
-    its own log list so test runs and concurrent demo invocations cannot
-    contaminate each other.  Use ``flush_logs()`` to drain and reset.
-    """
-
-    # Shared across all instances — operators registered at module import time.
     _registry: Dict[str, CMOFunction] = {}
 
     def __init__(self) -> None:
-        # Per-instance log list — never shared between instances.
         self._execution_logs: List[MaskingActionLog] = []
 
     @classmethod
@@ -99,9 +91,9 @@ class CMORegistry:
     ) -> Tuple[DataBlock, MaskingActionLog]:
         fn = self._registry.get(name) or _builtin_redact_cmo
 
-        t0 = time.perf_counter()
+        t0         = time.perf_counter()
         input_hash = data_block.content_hash()
-        out_block = fn(data_block, policy)
+        out_block  = fn(data_block, policy)
         latency_ms = (time.perf_counter() - t0) * 1000.0
 
         log = MaskingActionLog(
@@ -137,16 +129,10 @@ def _make_cmo(resolved_policy: str) -> CMOFunction:
             phi_spans=[],
             meta={**block.meta, "cmo": resolved_policy},
         )
-
     return cmo
 
 
 def _synthetic_cmo(block: DataBlock, policy: MaskingPolicyContract) -> DataBlock:
-    """
-    Synthetic replacement CMO: substitutes real names with generated fictional names
-    and shifts dates by a fixed offset rather than replacing with opaque tokens.
-    Preserves sentence structure and temporal ordering for downstream models.
-    """
     if block.modality in ("text", "asr"):
         out = apply_synthetic_replacement(str(block.payload))
     else:
@@ -167,26 +153,26 @@ def _synthetic_cmo(block: DataBlock, policy: MaskingPolicyContract) -> DataBlock
 
 _builtin_redact_cmo = _make_cmo("redact")
 _builtin_pseudo_cmo = _make_cmo("pseudo")
-_builtin_weak_cmo = _make_cmo("weak")
-_builtin_raw_cmo = _make_cmo("raw")
+_builtin_weak_cmo   = _make_cmo("weak")
+_builtin_raw_cmo    = _make_cmo("raw")
 
-CMORegistry.register("RedactTextSpan", _builtin_redact_cmo)
-CMORegistry.register("BlurImageRegion", _builtin_redact_cmo)
+CMORegistry.register("RedactTextSpan",    _builtin_redact_cmo)
+CMORegistry.register("BlurImageRegion",   _builtin_redact_cmo)
 CMORegistry.register("MaskWaveformHeader", _builtin_redact_cmo)
-CMORegistry.register("VoiceObfuscation", _builtin_redact_cmo)
+CMORegistry.register("VoiceObfuscation",  _builtin_redact_cmo)
 CMORegistry.register("RedactImageOverlay", _builtin_redact_cmo)
-CMORegistry.register("PseudonymizeID", _builtin_pseudo_cmo)
-CMORegistry.register("GeneralizeDate", _builtin_weak_cmo)
-CMORegistry.register("PassThrough", _builtin_raw_cmo)
-CMORegistry.register("SyntheticReplacement", _synthetic_cmo)  # synthetic name + date CMO
+CMORegistry.register("PseudonymizeID",    _builtin_pseudo_cmo)
+CMORegistry.register("GeneralizeDate",    _builtin_weak_cmo)
+CMORegistry.register("PassThrough",       _builtin_raw_cmo)
+CMORegistry.register("SyntheticReplacement", _synthetic_cmo)
 
 _default_registry: CMORegistry = CMORegistry()
 
 _POLICY_TO_CMO: Dict[str, str] = {
-    "redact": "RedactTextSpan",
-    "pseudo": "PseudonymizeID",
-    "weak": "GeneralizeDate",
-    "raw": "PassThrough",
+    "redact":    "RedactTextSpan",
+    "pseudo":    "PseudonymizeID",
+    "weak":      "GeneralizeDate",
+    "raw":       "PassThrough",
     "synthetic": "SyntheticReplacement",
 }
 
@@ -200,9 +186,9 @@ def apply_via_cmo(
     event_id: str = "",
     risk_score: float = 0.0,
 ) -> Tuple[Any, MaskingActionLog]:
-    cmo_name = _POLICY_TO_CMO.get(str(policy), "RedactTextSpan")
-    block = DataBlock(event_id=event_id, modality=modality, payload=payload)
-    contract = MaskingPolicyContract(
+    cmo_name  = _POLICY_TO_CMO.get(str(policy), "RedactTextSpan")
+    block     = DataBlock(event_id=event_id, modality=modality, payload=payload)
+    contract  = MaskingPolicyContract(
         modality=modality,
         chosen_policy=str(policy),
         patient_token=patient_token,

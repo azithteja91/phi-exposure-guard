@@ -1,3 +1,9 @@
+# DCPGAdapter bridges a live SQLite context state to graph nodes and edges
+# representing per-patient PHI exposure. Nodes are built from modality-grouped
+# exposure rows; edges capture co-occurrence and cross-modal link signals weighted
+# by temporal decay, semantic similarity, modality distance, and trust. Embeddings
+# are computed per-modality (text/ASR, audio, image) with an in-process LRU cache.
+
 from __future__ import annotations
 
 import math

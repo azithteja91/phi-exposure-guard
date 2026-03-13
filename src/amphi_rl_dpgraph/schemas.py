@@ -1,10 +1,15 @@
-# amphi_rl_dpgraph/schemas.py
+# Shared dataclasses for events, decisions, and audit records.
+# DataEvent carries raw payload plus detected PHI spans and unit count.
+# DecisionRecord captures the full policy decision including risk scores and
+# consent metadata. AuditRecord is the flattened per-event log row written
+# to JSONL and FHIR audit exports.
 
 from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
+
 
 @dataclass(frozen=True)
 class PHISpan:
@@ -13,16 +18,18 @@ class PHISpan:
     phi_type: str
     confidence: float = 1.0
 
+
 @dataclass
 class DataEvent:
     event_id: str
     patient_key: str
     timestamp: float
-    modality: str  # "text", "asr", "image_proxy", "waveform_proxy", "audio_proxy"
+    modality: str
     payload: Any
     phi_spans: List[PHISpan] = field(default_factory=list)
     phi_units: int = 0
     meta: Dict[str, Any] = field(default_factory=dict)
+
 
 @dataclass(frozen=True)
 class DecisionRecord:
@@ -46,6 +53,7 @@ class DecisionRecord:
 
     decision_id: str = field(default_factory=lambda: uuid.uuid4().hex[:12])
 
+
 @dataclass
 class AuditRecord:
     event_id: str
@@ -63,6 +71,12 @@ class AuditRecord:
     leaks_after: float
 
     policy_version: str = "v1"
+
+    decided_policy: str = ""
+    effective_policy: str = ""
+    consent_token_id: str = ""
+    consent_status: str = "ok"
+    override_reason: Optional[str] = None
 
     extra: Dict[str, Any] = field(default_factory=dict)
     decision_blob: Dict[str, Any] = field(default_factory=dict)

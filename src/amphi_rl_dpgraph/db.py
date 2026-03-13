@@ -1,3 +1,10 @@
+
+# Thin SQLite connection factory for the PHI exposure context store.
+# connect_db applies WAL mode and NORMAL sync for write throughput, and sets
+# row_factory to sqlite3.Row for column-name access. open_context is a
+# convenience wrapper. get_cross_modal_remask_count queries the remask_events
+# audit table and returns 0 safely if the table does not yet exist.
+
 from __future__ import annotations
 
 import sqlite3

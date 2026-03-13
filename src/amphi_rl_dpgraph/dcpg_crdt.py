@@ -1,3 +1,9 @@
+# CRDT-based graph for tracking per-patient PHI exposure across edge devices.
+# Each node represents a (patient_key, modality) pair and holds G-counter
+# phi/link counts plus last-write-wins fields for pseudonym version and risk
+# entropy. merge_node and CRDTGraph.merge_from guarantee convergence under
+# any merge order with no coordination required.
+
 from __future__ import annotations
 
 import math
@@ -8,20 +14,12 @@ from typing import Any, Dict, Optional
 
 @dataclass
 class CRDTNodeState:
-    """
-    Grow-only counter node for federated DCPG.
-
-    Each counter field is a G-Counter: values only increase and merge takes the max.
-    LWW fields use the highest timestamp.
-    """
     patient_key: str
     modality: str
 
-    # G-counters: device_id -> count
     phi_unit_counts: Dict[str, int] = field(default_factory=dict)
     link_counts: Dict[str, int] = field(default_factory=dict)
 
-    # last-write-wins fields (higher timestamp wins)
     pseudonym_version: int = 0
     pseudonym_version_ts: float = 0.0
 
@@ -64,11 +62,6 @@ class CRDTNodeState:
 
 
 def merge_node(a: CRDTNodeState, b: CRDTNodeState) -> CRDTNodeState:
-    """
-    Merge two CRDTNodeState instances.
-
-    G-Counter fields take element-wise max; LWW fields take highest timestamp.
-    """
     if a.patient_key != b.patient_key or a.modality != b.modality:
         raise ValueError("Can only merge nodes with matching patient_key and modality")
 
@@ -99,10 +92,6 @@ def merge_node(a: CRDTNodeState, b: CRDTNodeState) -> CRDTNodeState:
 
 @dataclass
 class CRDTGraph:
-    """
-    In-memory CRDT graph of patient nodes.
-    Supports local updates and merge with a remote peer's graph.
-    """
     device_id: str
     nodes: Dict[str, CRDTNodeState] = field(default_factory=dict)
 
@@ -152,18 +141,17 @@ class CRDTGraph:
             updated += 1
         return updated
 
-    def risk_for(self, patient_key: str, provisional_k: float = 0.03) -> float:
-       
+    def risk_for(self, patient_key: str, provisional_k: float = 0.012) -> float:
         patient_nodes = [n for n in self.nodes.values() if n.patient_key == patient_key]
         if not patient_nodes:
             return 0.0
 
         total_units = sum(n.total_phi_units for n in patient_nodes)
-        degree      = len({n.modality for n in patient_nodes})
-        k           = float(provisional_k)
+        degree = len({n.modality for n in patient_nodes})
+        k = float(provisional_k)
 
-        base       = 1.0 - math.exp(-k * float(total_units))
-        link_bonus = 0.10 * max(0, degree - 1)
+        base = 1.0 - math.exp(-k * float(total_units))
+        link_bonus = 0.05 * max(0, degree - 1)
         return float(max(0.0, min(1.0, base + link_bonus)))
 
     def summary(self) -> Dict[str, Any]:
@@ -184,7 +172,6 @@ class CRDTGraph:
 
 
 def demo_federated_merge() -> Dict[str, Any]:
-    
     device_a = CRDTGraph(device_id="edge_device_A")
     device_b = CRDTGraph(device_id="edge_device_B")
 

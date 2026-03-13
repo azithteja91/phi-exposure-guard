@@ -1,3 +1,12 @@
+# PHI detection and leakage counting for post-masking evaluation. PHI_PATTERN
+# matches dates, MRNs, and patient name patterns; _is_synthetic_match exempts
+# tokens produced by the synthetic replacement pipeline so they do not count
+# as leaks. find_phi_spans returns character-level span tuples; count_phi and
+# avg_leaks_per_note provide scalar summaries used by the eval harness.
+# _synthetic_mrn mirrors cmo_media.synthetic_mrn to avoid a circular import.
+
+from __future__ import annotations
+
 import re
 from typing import FrozenSet, List, Tuple
 
@@ -27,9 +36,8 @@ _SYNTHETIC_DATES: FrozenSet[str] = frozenset({
 })
 
 PATIENT_TOKEN_PREFIX = r"PATIENT_"
-_PSEUDO_PREFIXES = rf"(?:{PATIENT_TOKEN_PREFIX}|ID_{PATIENT_TOKEN_PREFIX})"
-
-_NAME = r"[a-z]{2,}"
+_PSEUDO_PREFIXES     = rf"(?:{PATIENT_TOKEN_PREFIX}|ID_{PATIENT_TOKEN_PREFIX})"
+_NAME                = r"[a-z]{2,}"
 
 _pattern_str = (
     r"("
@@ -44,42 +52,36 @@ _pattern_str = (
 )
 PHI_PATTERN = re.compile(_pattern_str, re.IGNORECASE)
 
+
 def _synthetic_mrn(original_mrn: str) -> str:
-    """Mirror of cmo_media.synthetic_mrn — kept local to avoid circular import."""
     digits = re.sub(r"\D", "", str(original_mrn))
     if not digits:
         return original_mrn
     result = []
     for i, d in enumerate(digits):
-        seed = f"{original_mrn}:{i}"
-        h = 0
+        seed  = f"{original_mrn}:{i}"
+        h     = 0
         for c in seed:
             h = (h * 31 + ord(c)) & 0xFFFFFFFF
         shift = (h % 9) + 1
         result.append(str((int(d) + shift) % 10))
     return "".join(result)
 
+
 def _is_synthetic_match(match_text: str) -> bool:
-    """
-    Return True if the matched text is a synthetic replacement rather than real PHI.
-    """
     t = match_text.strip()
 
     if re.fullmatch(r"\d{2}/\d{2}/\d{4}", t) and t in _SYNTHETIC_DATES:
         return True
 
-    # MRN<digits> tokens (no space) are produced exclusively by the synthetic
-    # replacement pipeline (e.g. "MRN0000" -> "MRN5678").  Real PHI always
-    # appears as "MRN <digits>" (space-separated).  Treat these as synthetic.
     if re.fullmatch(r"MRN[0-9]{1,10}", t, re.IGNORECASE):
         return True
 
     digits_only = re.sub(r"[^0-9]", "", t)
     if len(digits_only) in range(7, 11):
-        if re.fullmatch(r"\d{7,10}", digits_only):
-            stripped = re.sub(r"(?i)^mrn\s*", "", t).strip()
-            if re.fullmatch(r"\d{7,10}", stripped):
-                return True
+        stripped = re.sub(r"(?i)^mrn\s*", "", t).strip()
+        if stripped != t and re.fullmatch(r"\d{7,10}", stripped):
+            return True
 
     t_clean = re.sub(r"^patient[:\s]+", "", t, flags=re.IGNORECASE).strip()
     t_clean = re.sub(r"\s+mrn\s*$", "", t_clean, flags=re.IGNORECASE).strip()
@@ -96,6 +98,7 @@ def _is_synthetic_match(match_text: str) -> bool:
 
     return False
 
+
 def find_phi_spans(text: str) -> List[Tuple[int, int]]:
     spans: List[Tuple[int, int]] = []
     if text is None:
@@ -106,6 +109,7 @@ def find_phi_spans(text: str) -> List[Tuple[int, int]]:
             spans.append((m.start(), m.end()))
     return spans
 
+
 def count_phi(text: str) -> int:
     if text is None:
         return 0
@@ -114,8 +118,10 @@ def count_phi(text: str) -> int:
         if not _is_synthetic_match(m.group(0))
     )
 
+
 def leakage(text: str) -> int:
     return count_phi(text)
+
 
 def avg_leaks_per_note(texts) -> float:
     texts = list(texts)
